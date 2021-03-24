@@ -6,7 +6,7 @@
 //
 
 import Foundation
-struct ListItem {
+struct ListItem: Decodable {
     var text: String
     var selected: Bool
     var index: Int

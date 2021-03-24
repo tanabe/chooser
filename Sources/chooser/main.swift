@@ -89,7 +89,7 @@ func printItems(items: [ListItem], maxDisplayingItems: Int, position: Int, selec
         if item.index == position {
             prefix = "(o)"
         }
-        print("\(prefix) \(item.text)\n", terminator: "", to: &standardError)
+        print("  \(prefix) \(item.text)\n", terminator: "", to: &standardError)
     }
 
     return displayingItems

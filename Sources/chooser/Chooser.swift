@@ -31,15 +31,16 @@ struct Chooser: ParsableCommand {
     @Option(name: .shortAndLong, help: "The number of times to repeat 'phrase'.")
     var count: Int?
 
+    @Option(help: "The number of lines.")
+    var n: Int?
+
     @Argument(help: "The phrase to repeat.")
     var phrase: String
 
     fileprivate var currentIndex = 0
     fileprivate var displayedItems: [ListItem] = []
     fileprivate var items: [ListItem] = []
-    fileprivate var maxDisplayingItems = 10
 
-    // MARK: - fileprivate
     fileprivate func createList(rawItems: [String]) -> [ListItem] {
         var result: [ListItem] = []
         var index: Int = 0
@@ -127,19 +128,21 @@ struct Chooser: ParsableCommand {
         return items
     }
 
-    fileprivate mutating func cursorUp() {
-        if currentIndex > 0 {
-            currentIndex = currentIndex - 1
+    fileprivate func cursorUp(index: Int) -> Int {
+        if index > 0 {
+            return index - 1
         }
+        return index
     }
 
-    fileprivate mutating func cursorDown() {
-        if (currentIndex < items.count - 1) {
-            currentIndex = currentIndex + 1
+    fileprivate mutating func cursorDown(index: Int, listSize: Int) -> Int {
+        if (index < listSize - 1) {
+            return index + 1
         }
+        return index
     }
 
-    fileprivate mutating func waitKeyPress() {
+    fileprivate mutating func waitKeyPress(maxDisplayingItems: Int) {
         let c = getKeyPress()
         if (c != -1) {
             if (c == Keys.enter.rawValue) {
@@ -157,9 +160,9 @@ struct Chooser: ParsableCommand {
             }
 
             if (c == Keys.k.rawValue) {
-                cursorUp()
+                currentIndex = cursorUp(index: currentIndex)
             } else if (c == Keys.j.rawValue) {
-                cursorDown()
+                currentIndex = cursorDown(index: currentIndex, listSize: items.count)
             }
 
             // back
@@ -170,14 +173,20 @@ struct Chooser: ParsableCommand {
 
     mutating func run() throws {
         items = readInput()
-        maxDisplayingItems = min(items.count, 10)
+
+        var maxDisplayingItems = 10
+        if let n = n {
+            maxDisplayingItems = min(items.count, n)
+        } else {
+            maxDisplayingItems = min(items.count, 10)
+        }
 
         let _ = freopen("/dev/tty", "r", stdin)
 
         // start
         displayedItems = printItems(items: items, maxDisplayingItems: maxDisplayingItems, position: currentIndex, selected: currentIndex, lastDisplayedItems: displayedItems)
         while (true) {
-            waitKeyPress()
+            waitKeyPress(maxDisplayingItems: maxDisplayingItems)
         }
 
         /*

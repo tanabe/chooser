@@ -25,17 +25,11 @@ enum Keys: Int {
 }
 
 struct Chooser: ParsableCommand {
-    @Flag(help: "Include a counter with each repetition.")
-    var includeCounter = false
-
-    @Option(name: .shortAndLong, help: "The number of times to repeat 'phrase'.")
-    var count: Int?
-
     @Option(help: "The number of lines.")
     var n: Int?
 
-    @Argument(help: "The phrase to repeat.")
-    var phrase: String
+    @Flag(help: "Enable multiple selection.")
+    var multiple = false
 
     fileprivate var currentIndex = 0
     fileprivate var displayedItems: [ListItem] = []
@@ -71,7 +65,7 @@ struct Chooser: ParsableCommand {
         return key
     }
 
-    func printItems(items: [ListItem], maxDisplayingItems: Int, position: Int, selected: Int, lastDisplayedItems: [ListItem]) -> [ListItem] {
+    func printItems(items: [ListItem], maxDisplayingItems: Int, position: Int, lastDisplayedItems: [ListItem]) -> [ListItem] {
         var standardError = FileHandle.standardError
         if lastDisplayedItems.count > 0 {
             // clear display buffer
@@ -86,38 +80,45 @@ struct Chooser: ParsableCommand {
 
         let displayFrom = position
         let displayTo = min(displayFrom + maxDisplayingItems, items.count)
-        var displayingItems: [ListItem] = []
+
+        var nextDisplayingItems: [ListItem] = []
 
         if lastDisplayedItems.count == 0 {
-            displayingItems = Array(items[displayFrom..<displayTo])
+            nextDisplayingItems = Array(items[displayFrom..<displayTo])
         } else if lastDisplayedItems.contains(where: { (item) -> Bool in
             return item.index == position
         }) {
-            displayingItems = lastDisplayedItems
+            nextDisplayingItems = lastDisplayedItems
         } else {
             if let lastDisplayedFirstItem = lastDisplayedItems.first {
                 if position < lastDisplayedFirstItem.index {
                     let displayFrom = lastDisplayedFirstItem.index - 1
                     let displayTo = min(displayFrom + maxDisplayingItems, items.count)
-                    displayingItems = Array(items[displayFrom..<displayTo])
+                    nextDisplayingItems = Array(items[displayFrom..<displayTo])
                 } else {
                     let displayFrom = lastDisplayedFirstItem.index + 1
                     let displayTo = min(displayFrom + maxDisplayingItems, items.count)
-                    displayingItems = Array(items[displayFrom..<displayTo])
+                    nextDisplayingItems = Array(items[displayFrom..<displayTo])
                 }
             }
         }
 
-        for index in 0..<displayingItems.count {
-            let item = displayingItems[index]
+        for index in 0..<nextDisplayingItems.count {
+            let item = nextDisplayingItems[index]
+            var cursor = " "
+            if item.index == currentIndex {
+                cursor = ">"
+            }
+
             var prefix = "( )"
-            if item.index == position {
+            if item.selected {
                 prefix = "(o)"
             }
+
             var standardError = FileHandle.standardError
-            print("  \(prefix) \(item.text)\n", terminator: "", to: &standardError)
+            print("\(cursor) \(prefix) \(item.text)\n", terminator: "", to: &standardError)
         }
-        return displayingItems
+        return nextDisplayingItems
     }
 
     fileprivate func readInput() -> [ListItem] {
@@ -143,36 +144,75 @@ struct Chooser: ParsableCommand {
     }
 
     fileprivate mutating func waitKeyPress(maxDisplayingItems: Int) {
-        let c = getKeyPress()
-        if (c != -1) {
-            if (c == Keys.enter.rawValue) {
-                let selectedItem = items[currentIndex]
-                print(selectedItem.text)
+        let key = getKeyPress()
+        if (key != -1) {
+            if (key == Keys.enter.rawValue) {
+                let selectedItems = items.filter { (item) -> Bool in
+                    item.selected
+                }.map { (item) -> String in
+                    return item.text
+                }
+
+                print(selectedItems.joined(separator: "\n"))
                 Chooser.exit()
             }
 
-            if (c == Keys.q.rawValue) {
+            if (key == Keys.q.rawValue) {
                 Chooser.exit()
             }
 
-            if (c == Keys.space.rawValue) {
-                //
+            if (key == Keys.space.rawValue) {
+                items[currentIndex].selected.toggle()
             }
 
-            if (c == Keys.k.rawValue) {
+            if (key == Keys.k.rawValue) {
                 currentIndex = cursorUp(index: currentIndex)
-            } else if (c == Keys.j.rawValue) {
+            } else if (key == Keys.j.rawValue) {
                 currentIndex = cursorDown(index: currentIndex, listSize: items.count)
             }
 
-            // back
-            displayedItems = printItems(items: items, maxDisplayingItems: maxDisplayingItems, position: currentIndex, selected: currentIndex, lastDisplayedItems: displayedItems)
+            if (multiple) {
+                for index in 0..<displayedItems.count {
+                    let displayedItem = displayedItems[index]
+                    let displayedItemIndex = displayedItem.index
+                    displayedItems[index].selected = false
+                    if let _ = items.first(where: { (item) -> Bool in
+                        return item.selected && item.index == displayedItemIndex
+                    }) {
+                        displayedItems[index].selected = true
+                    }
+                }
+            } else {
+                for index in 0..<items.count {
+                    items[index].selected = false
+                }
+                items[currentIndex].selected = true
+
+                // A little tricky
+                for index in 0..<displayedItems.count {
+                    let displayedItem = displayedItems[index]
+                    let displayedItemIndex = displayedItem.index
+                    displayedItems[index].selected = false
+                    if let _ = items.first(where: { (item) -> Bool in
+                        return item.selected && item.index == displayedItemIndex
+                    }) {
+                        displayedItems[index].selected = true
+                    }
+                }
+            }
+
+            // display
+            displayedItems = printItems(items: items, maxDisplayingItems: maxDisplayingItems, position: currentIndex, lastDisplayedItems: displayedItems)
             fflush(stderr)
         }
     }
 
     mutating func run() throws {
         items = readInput()
+        if (items.count == 0) {
+            print("No inputs")
+            Chooser.exit()
+        }
 
         var maxDisplayingItems = 10
         if let n = n {
@@ -183,21 +223,13 @@ struct Chooser: ParsableCommand {
 
         let _ = freopen("/dev/tty", "r", stdin)
 
-        // start
-        displayedItems = printItems(items: items, maxDisplayingItems: maxDisplayingItems, position: currentIndex, selected: currentIndex, lastDisplayedItems: displayedItems)
+        if !multiple {
+            items[currentIndex].selected = true
+        }
+
+        displayedItems = printItems(items: items, maxDisplayingItems: maxDisplayingItems, position: currentIndex, lastDisplayedItems: displayedItems)
         while (true) {
             waitKeyPress(maxDisplayingItems: maxDisplayingItems)
         }
-
-        /*
-        let repeatCount = count ?? .max
-        for i in 1...repeatCount {
-            if includeCounter {
-                print("\(i): \(phrase)")
-            } else {
-                print(phrase)
-            }
-        }
- */
     }
 }

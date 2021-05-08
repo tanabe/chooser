@@ -1,3 +1,9 @@
-# chooser
+# Chooser
 
-A description of this package.
+Interactive selector.
+
+# Build 
+
+```
+$ swift build
+```

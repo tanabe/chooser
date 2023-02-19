@@ -1,9 +1,15 @@
 # Chooser
 
-Interactive selector.
+This is a interactive selector.
 
 # Build 
 
 ```
-$ swift build
+$ make
+```
+
+# How to use
+
+```
+ls | .build/arm64-apple-macosx/debug/chooser | xargs cat
 ```

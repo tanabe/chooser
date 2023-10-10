@@ -19,6 +19,10 @@ extension FileHandle : TextOutputStream {
 enum Keys: Int {
     case enter = 10
     case space = 32
+    case escapeCode = 27
+    case arrowUp = 65
+    case arrowDown = 66
+    case arrowCode = 91
     case j = 106
     case k = 107
     case q = 113
@@ -52,16 +56,15 @@ struct Chooser: ParsableCommand {
         return inputString.trimmingCharacters(in: CharacterSet.newlines)
     }
 
-    fileprivate func getKeyPress () -> Int {
-        var key: Int = 0
+    private func getPressedKeyCode () -> Int {
         var oldt: termios = termios()
-        let file_no = STDIN_FILENO
-        tcgetattr(file_no, &oldt)
+        let descriptor = STDIN_FILENO
+        tcgetattr(descriptor, &oldt)
         var newt = oldt
         newt.c_lflag = newt.c_lflag & ~UInt(ECHO | ICANON | IEXTEN)
-        tcsetattr(file_no, TCSANOW, &newt)
-        key = Int(getchar())
-        tcsetattr(file_no, TCSANOW, &oldt)
+        tcsetattr(descriptor, TCSANOW, &newt)
+        let key = Int(getchar())
+        tcsetattr(descriptor, TCSANOW, &oldt)
         return key
     }
 
@@ -144,7 +147,7 @@ struct Chooser: ParsableCommand {
     }
 
     fileprivate mutating func waitKeyPress(maxDisplayingItems: Int) {
-        let key = getKeyPress()
+        let key = getPressedKeyCode()
         if (key != -1) {
             if (key == Keys.enter.rawValue) {
                 let selectedItems = items.filter { (item) -> Bool in
@@ -163,6 +166,19 @@ struct Chooser: ParsableCommand {
 
             if (key == Keys.space.rawValue) {
                 items[currentIndex].selected.toggle()
+            }
+
+            // arrows keys are a little complex
+            // for example, arrow up key is consist of three codes 27 91 65
+            if (key == Keys.escapeCode.rawValue) {
+                if (getPressedKeyCode() == Keys.arrowCode.rawValue) {
+                    let arrowKeyCode = getPressedKeyCode()
+                    if (arrowKeyCode == Keys.arrowUp.rawValue) {
+                        currentIndex = cursorUp(index: currentIndex)
+                    } else if (arrowKeyCode == Keys.arrowDown.rawValue) {
+                        currentIndex = cursorDown(index: currentIndex, listSize: items.count)
+                    }
+                }
             }
 
             if (key == Keys.k.rawValue) {

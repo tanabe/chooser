@@ -2,11 +2,16 @@
 
 This is an interactive selector.
 
-# Build 
+# Build executable
+
+Make sure Xcode is installed first.
 
 ```
-$ make
+make
 ```
+
+And then, You can find executable binary `chooser` in .build/debug directory.  
+I recommend you to copy the binary into $HOME/bin directory.
 
 # How to use
 
@@ -28,3 +33,26 @@ And then you can select a file interactively.
   ( ) Tests
 
 ```
+
+# More samples for git users
+
+I'm using these snippets as a command alias for daily use.
+
+## Push current git branch with confirmation
+
+```
+git branch | grep "\*" | awk "{ print \$2 }" | chooser | xargs -I{} git push origin {}
+```
+
+## Change git branch
+
+```
+git branch --format='%(refname:short)' | chooser --multiple | xargs -I{} git checkout {}
+```
+
+## Delete git branches
+
+```
+git branch --format='%(refname:short)' | chooser --multiple | xargs -I{} git branch -d {}
+```
+

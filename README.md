@@ -47,12 +47,12 @@ git branch | grep "\*" | awk "{ print \$2 }" | chooser | xargs -I{} git push ori
 ## Change git branch
 
 ```
-git branch --format='%(refname:short)' | chooser --multiple | xargs -I{} git checkout {}
+git branch --format="%(refname:short)" | chooser --multiple | xargs -I{} git checkout {}
 ```
 
 ## Delete git branches
 
 ```
-git branch --format='%(refname:short)' | chooser --multiple | xargs -I{} git branch -d {}
+git branch --format="%(refname:short)" | chooser --multiple | xargs -I{} git branch -d {}
 ```
 
